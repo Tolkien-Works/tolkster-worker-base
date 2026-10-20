@@ -51,5 +51,7 @@ jobs:
           set -euo pipefail
           docker build --pull --build-arg "ORCA_VERSION=$ORCA" -t "$IMAGE:orca-$ORCA" -t "$IMAGE:latest" .
           docker run --rm "$IMAGE:orca-$ORCA" sh -c 'git --version && orca-ide --version && ! command -v claude && ! test -e ~/.config/orca'
-          docker push "$IMAGE:orca-$ORCA"
+          # `latest` first: the version tag is what marks the release built, so a failed
+          # push leaves it missing and the next run tries again.
           docker push "$IMAGE:latest"
+          docker push "$IMAGE:orca-$ORCA"
