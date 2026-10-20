@@ -1,0 +1,55 @@
+# Builds and pushes the image only when Orca has released a version it doesn't have yet,
+# tagged `orca-<version>` and `latest`. Run by hand, it rebuilds Orca's latest regardless.
+# Uses only GitHub's own actions and the workflow's token.
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: nightly
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Compare Orca's latest release with the image's
+        id: versions
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          orca=$(gh release view --repo stablyai/orca --json tagName --jq .tagName)
+          orca=${orca#v}
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "orca=$orca" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && docker manifest inspect "$image:orca-$orca" > /dev/null 2>&1; then
+            echo "Orca $orca is already built"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push
+        if: steps.versions.outputs.build == 'true'
+        env:
+          IMAGE: ${{ steps.versions.outputs.image }}
+          ORCA: ${{ steps.versions.outputs.orca }}
+        run: |
+          set -euo pipefail
+          docker build --pull --build-arg "ORCA_VERSION=$ORCA" -t "$IMAGE:orca-$ORCA" -t "$IMAGE:latest" .
+          docker run --rm "$IMAGE:orca-$ORCA" sh -c 'git --version && orca-ide --version && ! command -v claude && ! test -e ~/.config/orca'
+          docker push "$IMAGE:orca-$ORCA"
+          docker push "$IMAGE:latest"
