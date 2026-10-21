@@ -1,7 +1,8 @@
 # tolkster-worker-base
 
 The base image for a machine that runs coding agents through [Orca](https://github.com/stablyai/orca)'s
-remote runtimes: Debian with Node 24, git and Orca's Linux app (`orca-ide serve`).
+remote runtimes: Ubuntu 26.04 LTS with Node 24, git that runs hooks from config (2.54 or
+later, from the Ubuntu Git Maintainers' PPA) and Orca's Linux app (`orca-ide serve`).
 
 ```
 docker pull ghcr.io/tolkien-works/tolkster-worker-base:latest
